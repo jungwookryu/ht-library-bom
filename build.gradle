@@ -1,0 +1,49 @@
+import java.util.regex.Matcher
+
+plugins {
+    id 'java'
+    id 'maven-publish'
+}
+
+version = '0.0.1'
+
+bootJar { enabled = false }
+
+dependencies {
+    api ('com.ht:ht-node-common:0.0.4')
+    api ('com.ht:ht-domain-event:0.0.19')
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId = 'com.ht'
+            artifactId = 'ht-library-bom'
+            from components.java
+        }
+    }
+    repositories {
+        mavenLocal()  // 로컬 Maven 저장소에 퍼블리시
+    }
+}
+
+// Duplicated tag 에러를 막기 위해 아래 스크립트 추가
+task fixPom {
+    doLast {
+        File file = new File("$buildDir/publications/mavenJava/pom-default.xml")
+        def text = file.text
+        def pattern = "(?s)(<dependencyManagement>.+?<dependencies>)(.+?)(</dependencies>.+?</dependencyManagement>)"
+        Matcher matcher = text =~ pattern
+        if (matcher.find()) {
+            text = text.replaceFirst(pattern, "")
+            def firstDeps = matcher.group(2)
+            text = text.replaceFirst(pattern, '$1$2' + firstDeps + '$3')
+        }
+        file.write(text)
+    }
+}
+generatePomFileForMavenJavaPublication.finalizedBy fixPom
+
+tasks.named('publishToMavenLocal') {
+    dependsOn ':ht-domain-event:publishToMavenLocal', ':ht-node-common:publishToMavenLocal'
+}
